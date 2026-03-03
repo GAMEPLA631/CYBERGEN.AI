@@ -202,10 +202,10 @@
                 <div class="p-6 border-b border-white/10 flex justify-between items-center">
                     <div>
                         <h2 class="text-2xl font-cyber text-purple-400">AI Neural Chat</h2>
-                        <p class="text-[10px] text-gray-400 uppercase">Komunikácia s veľkými jazykovými modelmi</p>
+                        <p class="text-[10px] text-gray-400 uppercase">Komunikácia s neurálnymi modelmi</p>
                     </div>
                     <select id="chatModel" class="bg-black/60 border border-purple-500/30 rounded-lg px-4 py-2 text-xs text-purple-400 outline-none">
-                        <option value="gemini">Google Gemini 1.5 Pro</option>
+                        <option value="gemini">Gemini 2.5 Flash Preview</option>
                         <option value="openrouter-gpt">OpenRouter: GPT-4o</option>
                         <option value="openrouter-claude">OpenRouter: Claude 3.5 Sonnet</option>
                     </select>
@@ -215,14 +215,14 @@
                     <div class="flex flex-col gap-1 max-w-[80%]">
                         <span class="text-[9px] uppercase text-purple-400 font-bold ml-2">Systém</span>
                         <div class="bg-purple-500/10 border border-purple-500/20 p-3 rounded-2xl rounded-tl-none text-sm">
-                            Vítaj v neurálnom rozhraní. Vyber si model a začni konverzáciu. Ak máš chybu pripojenia, skontroluj svoje API kľúče v nastaveniach.
+                            Neurálne spojenie naviazané. Model Gemini 2.5 Flash je pripravený na spracovanie dopytov.
                         </div>
                     </div>
                 </div>
 
                 <div class="p-6 bg-black/40 border-t border-white/10">
                     <div class="flex gap-3">
-                        <input id="chatInput" type="text" placeholder="Napíš správu pre AI..." 
+                        <input id="chatInput" type="text" placeholder="Zadaj neurálny dopyt..." 
                             class="flex-1 bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                             onkeydown="if(event.key === 'Enter') sendChatMessage()">
                         <button onclick="sendChatMessage()" class="p-3 bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-lg shadow-purple-900/20">
@@ -387,7 +387,6 @@
                     const response = await fetch(url, options);
                     if (response.ok) return response;
                     
-                    // Specific error handling for API responses
                     const errorData = await response.json().catch(() => ({}));
                     const errorMsg = errorData.error?.message || response.statusText;
                     
@@ -407,12 +406,11 @@
             const modelKey = document.getElementById('chatModel').value;
             
             if (!text) return;
-            if (modelKey.includes('openrouter') && !keys.openrouter) {
-                showToast("Zadaj OpenRouter kľúč", true);
-                return toggleSettings();
-            }
-            if (modelKey === 'gemini' && !keys.gemini) {
-                showToast("Zadaj Gemini kľúč", true);
+            
+            // API key check
+            const apiKey = modelKey === 'gemini' ? keys.gemini : keys.openrouter;
+            if (!apiKey) {
+                showToast(`Chýba kľúč pre ${modelKey}`, true);
                 return toggleSettings();
             }
 
@@ -433,7 +431,7 @@
                 updateMessage(loadingMsgId, responseText);
             } catch (err) {
                 updateMessage(loadingMsgId, "Chyba pripojenia: " + err.message);
-                showToast("Chat zlyhal - skontroluj kľúče", true);
+                showToast("Chat zlyhal", true);
             }
         }
 
@@ -468,16 +466,17 @@
         }
 
         async function callGeminiChat(prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${keys.gemini}`;
+            // Updated to Gemini 2.5 Flash Preview 09-2025 as requested
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${keys.gemini}`;
             const res = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    contents: [{ role: "user", parts: [{ text: prompt }] }] 
+                    contents: [{ parts: [{ text: prompt }] }] 
                 })
             });
             const data = await res.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text || "Model Gemini neodpovedal správne.";
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || "Model Gemini 2.5 neodpovedal správne.";
         }
 
         async function callOpenRouterChat(prompt, model) {
@@ -495,7 +494,7 @@
                 })
             });
             const data = await res.json();
-            return data.choices?.[0]?.message?.content || "Model OpenRouter neodpovedal správne.";
+            return data.choices?.[0]?.message?.content || "Model OpenRouter neodpovedal.";
         }
 
         // --- IMAGE GEN & GALLERY ---
@@ -509,7 +508,7 @@
             try {
                 let imageData = '';
                 if (service === 'stability') imageData = await callStability(prompt);
-                else throw new Error("Pre tento model vymeň engine alebo nastav API kľúč.");
+                else throw new Error("Pre tento engine nastavte API kľúč.");
 
                 const tx = db.transaction('images', 'readwrite');
                 await tx.objectStore('images').add({ imageData, prompt, service, timestamp: new Date().toISOString() });
@@ -534,10 +533,7 @@
 
         async function searchYouTube() {
             const query = document.getElementById('ytSearchQuery').value;
-            if (!keys.youtube) {
-                showToast("Zadaj YouTube API kľúč", true);
-                return toggleSettings();
-            }
+            if (!keys.youtube) return toggleSettings();
             if (!query) return;
             document.getElementById('loadingOverlay').classList.remove('hidden');
             try {
@@ -615,3 +611,4 @@
     </script>
 </body>
 </html>
+
